@@ -1,0 +1,209 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* School Website Design System - Blue, Orange, White theme */
+
+@layer base {
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 220 91% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 25 95% 53%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 8% 46%;
+
+    --accent: 25 95% 53%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 220 91% 50%;
+
+    --radius: 0.5rem;
+
+    --school-blue: 220 91% 50%;
+    --school-orange: 25 95% 53%;
+    --school-white: 0 0% 100%;
+    --school-blue-light: 220 91% 95%;
+    --school-orange-light: 25 95% 95%;
+    --school-blue-dark: 220 91% 40%;
+    --school-orange-dark: 25 95% 45%;
+  }
+
+  .dark {
+    --background: 220 15% 8%;
+    --foreground: 210 40% 98%;
+    --card: 220 15% 10%;
+    --card-foreground: 210 40% 98%;
+    --popover: 220 15% 10%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 220 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 25 95% 63%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 25 95% 63%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 220 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    background: linear-gradient(135deg, 
+      hsl(var(--school-white)) 0%, 
+      hsl(var(--school-blue-light)) 25%, 
+      hsl(var(--school-white)) 50%, 
+      hsl(var(--school-orange-light)) 75%, 
+      hsl(var(--school-white)) 100%);
+    min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  .school-gradient {
+    background: linear-gradient(135deg, hsl(var(--school-blue)) 0%, hsl(var(--school-orange)) 100%);
+  }
+  
+  .school-gradient-light {
+    background: linear-gradient(135deg, hsl(var(--school-blue-light)) 0%, hsl(var(--school-orange-light)) 100%);
+  }
+  
+  .school-blue {
+    background-color: hsl(var(--school-blue));
+  }
+  
+  .school-orange {
+    background-color: hsl(var(--school-orange));
+  }
+  
+  .text-school-blue {
+    color: hsl(var(--school-blue));
+  }
+  
+  .text-school-orange {
+    color: hsl(var(--school-orange));
+  }
+
+  .bg-school-blue {
+    background-color: hsl(var(--school-blue));
+  }
+  
+  .bg-school-orange {
+    background-color: hsl(var(--school-orange));
+  }
+  
+  .bg-school-blue-light {
+    background-color: hsl(var(--school-blue-light));
+  }
+  
+  .bg-school-orange-light {
+    background-color: hsl(var(--school-orange-light));
+  }
+  
+  .bg-school-blue-dark {
+    background-color: hsl(var(--school-blue-dark));
+  }
+  
+  .bg-school-orange-dark {
+    background-color: hsl(var(--school-orange-dark));
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.6s ease-in-out;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Page backgrounds with blue, orange, white theme */
+  .page-background {
+    background: linear-gradient(135deg, 
+      hsl(var(--school-white)) 0%, 
+      hsl(var(--school-blue-light)) 20%, 
+      hsl(var(--school-white)) 40%, 
+      hsl(var(--school-orange-light)) 60%, 
+      hsl(var(--school-white)) 80%, 
+      hsl(var(--school-blue-light)) 100%);
+  }
+
+  /* Embedded Google Maps styles */
+  .embed-map-responsive {
+    position: relative;
+    text-align: right;
+    width: 100%;
+    height: 0;
+    padding-bottom: 75%;
+  }
+  
+  .embed-map-container {
+    overflow: hidden;
+    background: none !important;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  
+  .embed-map-frame {
+    width: 100% !important;
+    height: 100% !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    border: none;
+  }
+
+  /* Responsive utilities */
+  @media (max-width: 640px) {
+    .container {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .text-4xl {
+      font-size: 2.25rem;
+    }
+    
+    .text-5xl {
+      font-size: 3rem;
+    }
+  }
+}

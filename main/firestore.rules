@@ -1,0 +1,77 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- 1. PUBLIC WEBSITE CONTENT (Fixes "Real Time Site" issues) ---
+    // Allow anyone to READ these, but only Admins can WRITE.
+    
+    match /school/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null && isApprovedAdmin();
+    }
+    
+    match /notices/{noticeId} {
+      allow read: if true;
+      allow write: if request.auth != null && isApprovedAdmin();
+    }
+    
+    match /gallery/{imageId} {
+      allow read: if true;
+      allow write: if request.auth != null && isApprovedAdmin();
+    }
+    
+    match /content/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null && isApprovedAdmin();
+    }
+    
+    match /admissions/{docId} {
+      // Public can CREATE admission inquiries, but NOT read them
+      allow create: if true;
+      allow read, update, delete: if request.auth != null && isApprovedAdmin();
+    }
+
+    // --- 2. ADMIN ACCOUNTS (Fixes "Registration Failed") ---
+    match /admins/{userId} {
+      // FIX: Allow creation if status is 'pending', even if email isn't verified yet.
+      allow create: if request.auth != null 
+                    && request.resource.data.status == 'pending'
+                    && request.auth.uid == userId;
+      
+      // Allow users to read their own data to check approval status
+      allow read: if request.auth != null;
+      
+      // Only Approved Admins can update status (approve/reject others)
+      allow update: if request.auth != null && isApprovedAdmin();
+      
+      // Only Approved Admins can delete
+      allow delete: if request.auth != null && isApprovedAdmin();
+    }
+    
+    // --- 3. LOGGING & SECURITY (Fixes Login/OTP issues) ---
+    match /admin_login_activities/{activityId} {
+      // FIX: Allow writing "failed" logs even if not logged in (for security tracking)
+      allow create: if (request.auth != null) || 
+                    (request.resource.data.status == 'failed');
+      
+      allow read: if request.auth != null && isApprovedAdmin();
+    }
+
+    match /security_events/{eventId} {
+      allow create: if true; // Allow logging security events from client
+      allow read: if request.auth != null && isApprovedAdmin();
+    }
+    
+    match /rate_limits/{identifier} {
+      // Allow anyone to read/write rate limits (needed for login protection)
+      allow read, write: if true;
+    }
+
+    // --- HELPER FUNCTIONS ---
+    function isApprovedAdmin() {
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.status == 'approved';
+    }
+  }
+}

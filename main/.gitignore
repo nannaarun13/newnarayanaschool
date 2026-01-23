@@ -1,0 +1,48 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build Output
+dist
+dist-ssr
+
+# Local Environment & Secrets (Important!)
+*.local
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Firebase Specific
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Vercel Specific
+.vercel
+
+# OS Generated Files
+Thumbs.db
+Desktop.ini
