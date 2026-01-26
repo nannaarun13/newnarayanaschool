@@ -4,11 +4,20 @@ import { z } from "zod";
 import {
   signInWithEmailAndPassword,
   signOut,
+  User,
 } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 
 /* =======================
-   LOGIN VALIDATION SCHEMA
+   LOGIN VALIDATION
 ======================= */
 
 export const loginSchema = z.object({
@@ -36,14 +45,7 @@ export const handleLogin = async (
     throw new Error("Email and password are required");
   }
 
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-  } catch (error: any) {
-    console.error("Login failed:", error);
-    throw new Error(
-      error?.message || "Invalid email or password"
-    );
-  }
+  await signInWithEmailAndPassword(auth, email, password);
 };
 
 /* =======================
@@ -51,10 +53,40 @@ export const handleLogin = async (
 ======================= */
 
 export const handleLogout = async (): Promise<void> => {
+  await signOut(auth);
+};
+
+/* =======================
+   ADMIN CHECK (USED BY RouteProtection)
+======================= */
+
+export const isUserAdmin = async (
+  user: User | null
+): Promise<boolean> => {
   try {
-    await signOut(auth);
+    if (!user) return false;
+
+    // 1️⃣ Check by document ID (UID)
+    const adminDoc = await getDoc(doc(db, "admins", user.uid));
+    if (adminDoc.exists()) {
+      const data = adminDoc.data();
+      return data?.status === "approved";
+    }
+
+    // 2️⃣ Fallback: check by email
+    if (!user.email) return false;
+
+    const q = query(
+      collection(db, "admins"),
+      where("email", "==", user.email.toLowerCase())
+    );
+
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return false;
+
+    return snapshot.docs[0].data()?.status === "approved";
   } catch (error) {
-    console.error("Logout failed:", error);
-    throw error;
+    console.error("Error checking admin status:", error);
+    return false;
   }
 };
