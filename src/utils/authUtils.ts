@@ -67,4 +67,47 @@ export const handleLogout = async (): Promise<void> => {
   await signOut(auth);
 };
 
-/
+/* =======================
+   FORGOT PASSWORD HANDLER
+======================= */
+
+export const handleForgotPassword = async (
+  data: ForgotPasswordFormData
+): Promise<void> => {
+  const { email } = data;
+  await sendPasswordResetEmail(auth, email);
+};
+
+/* =======================
+   ADMIN CHECK
+======================= */
+
+export const isUserAdmin = async (
+  user: User | null
+): Promise<boolean> => {
+  try {
+    if (!user) return false;
+
+    // Check by UID
+    const adminDoc = await getDoc(doc(db, "admins", user.uid));
+    if (adminDoc.exists()) {
+      return adminDoc.data()?.status === "approved";
+    }
+
+    // Fallback: check by email
+    if (!user.email) return false;
+
+    const q = query(
+      collection(db, "admins"),
+      where("email", "==", user.email.toLowerCase())
+    );
+
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return false;
+
+    return snapshot.docs[0].data()?.status === "approved";
+  } catch (error) {
+    console.error("Admin check failed:", error);
+    return false;
+  }
+};
