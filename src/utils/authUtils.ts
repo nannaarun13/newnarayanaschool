@@ -14,6 +14,7 @@ import {
   getDocs,
   getDoc,
   doc,
+  setDoc,
   updateDoc,
   deleteField,
   UpdateData,
@@ -21,18 +22,24 @@ import {
 import { auth, db } from "@/lib/firebase";
 
 /* =======================
+   CONSTANTS
+======================= */
+
+export const DEFAULT_ADMIN_EMAIL = "arunnanna3@gmail.com";
+
+/* =======================
    TYPES
 ======================= */
 
 export interface AdminUser {
-  uid: string;
   id: string;
-  firstName: string;
-  lastName: string;
+  uid: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
-  phone: string;
+  phone?: string;
   status: "pending" | "approved" | "rejected" | "revoked";
-  requestedAt: string;
+  requestedAt?: string;
   approvedAt?: string;
   approvedBy?: string;
   rejectedAt?: string;
@@ -42,95 +49,118 @@ export interface AdminUser {
 }
 
 /* =======================
-   SCHEMAS
+   VALIDATION SCHEMAS
 ======================= */
 
 export const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z.string().email("Invalid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
 export type LoginFormData = z.infer<typeof loginSchema>;
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z.string().email("Invalid email"),
 });
 
 export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 
 /* =======================
-   AUTH HANDLERS
+   AUTH ACTIONS
 ======================= */
 
-export const handleLogin = async (data: LoginFormData): Promise<void> => {
-  await signInWithEmailAndPassword(auth, data.email, data.password);
+export const handleLogin = async (
+  data: LoginFormData
+): Promise<User> => {
+  const cred = await signInWithEmailAndPassword(
+    auth,
+    data.email.toLowerCase(),
+    data.password
+  );
+
+  const user = cred.user;
+
+  // 🔐 Ensure admin record exists & is valid
+  const isAdmin = await ensureAdminAccess(user);
+
+  if (!isAdmin) {
+    await signOut(auth);
+    throw new Error("Access denied. Not an approved admin.");
+  }
+
+  return user;
 };
 
 export const handleLogout = async (): Promise<void> => {
   await signOut(auth);
 };
 
-export const handleForgotPassword = async (data: ForgotPasswordFormData): Promise<void> => {
-  await sendPasswordResetEmail(auth, data.email);
+export const handleForgotPassword = async (
+  data: ForgotPasswordFormData
+): Promise<void> => {
+  await sendPasswordResetEmail(auth, data.email.toLowerCase());
 };
 
 /* =======================
-   ADMIN CHECK
+   ADMIN CORE LOGIC
 ======================= */
 
-export const isUserAdmin = async (user: User | null): Promise<boolean> => {
-  try {
-    if (!user) return false;
+export const ensureAdminAccess = async (
+  user: User | null
+): Promise<boolean> => {
+  if (!user || !user.uid) return false;
 
-    // Check by UID first (most secure)
-    const adminDoc = await getDoc(doc(db, "admins", user.uid));
-    if (adminDoc.exists()) {
-      return adminDoc.data()?.status === "approved";
-    }
+  const email = user.email?.toLowerCase() || "";
+  const adminRef = doc(db, "admins", user.uid);
+  const snap = await getDoc(adminRef);
 
-    if (!user.email) return false;
-
-    // Fallback: Check by Email
-    const q = query(
-      collection(db, "admins"),
-      where("email", "==", user.email.toLowerCase())
-    );
-
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) return false;
-
-    return snapshot.docs[0].data()?.status === "approved";
-  } catch (error) {
-    console.error("Admin check failed:", error);
-    return false;
+  // ✅ Admin document exists
+  if (snap.exists()) {
+    const data = snap.data();
+    return data.status === "approved";
   }
+
+  // 🔥 Auto-create SUPER ADMIN
+  if (email === DEFAULT_ADMIN_EMAIL) {
+    await setDoc(adminRef, {
+      uid: user.uid,
+      email,
+      status: "approved",
+      approvedAt: new Date().toISOString(),
+      approvedBy: "system",
+    });
+    return true;
+  }
+
+  // ❌ Not admin
+  return false;
+};
+
+export const isUserAdmin = async (
+  user: User | null
+): Promise<boolean> => {
+  if (!user) return false;
+
+  const adminSnap = await getDoc(doc(db, "admins", user.uid));
+  if (!adminSnap.exists()) return false;
+
+  return adminSnap.data()?.status === "approved";
 };
 
 /* =======================
-   ADMIN REQUESTS
+   ADMIN MANAGEMENT
 ======================= */
 
 export const getAdminRequests = async (): Promise<AdminUser[]> => {
   try {
-    const q = query(collection(db, "admins"));
-    const snapshot = await getDocs(q);
-
-    return snapshot.docs.map((docSnap) => {
-      const data = docSnap.data();
-      return {
-        id: docSnap.id,
-        uid: data.uid || docSnap.id,
-        firstName: data.firstName || "",
-        lastName: data.lastName || "",
-        email: data.email || "",
-        phone: data.phone || "",
-        status: data.status || "pending",
-        requestedAt: data.requestedAt || new Date().toISOString(),
-        ...data, // Spread remaining optional fields (approvedAt, etc.)
-      } as AdminUser;
-    });
+    const snapshot = await getDocs(collection(db, "admins"));
+    return snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      uid: docSnap.id,
+      ...docSnap.data(),
+    })) as AdminUser[];
   } catch (error) {
-    console.error("Failed to fetch admin requests:", error);
+    console.error("Failed to fetch admins:", error);
     return [];
   }
 };
@@ -138,26 +168,28 @@ export const getAdminRequests = async (): Promise<AdminUser[]> => {
 export const updateAdminRequestStatus = async (
   uid: string,
   status: "approved" | "rejected" | "revoked",
-  actionBy?: string
+  actionBy = "system"
 ): Promise<void> => {
   const ref = doc(db, "admins", uid);
   const now = new Date().toISOString();
 
-  // Using UpdateData<any> ensures Firestore accepts deleteField() alongside strings
   const updateData: UpdateData<any> = { status };
 
   if (status === "approved") {
     updateData.approvedAt = now;
-    updateData.approvedBy = actionBy || "system";
+    updateData.approvedBy = actionBy;
     updateData.rejectedAt = deleteField();
     updateData.revokedAt = deleteField();
-  } else if (status === "rejected") {
+  }
+
+  if (status === "rejected") {
     updateData.rejectedAt = now;
-    updateData.rejectedBy = actionBy || "system";
-    updateData.approvedAt = deleteField();
-  } else if (status === "revoked") {
+    updateData.rejectedBy = actionBy;
+  }
+
+  if (status === "revoked") {
     updateData.revokedAt = now;
-    updateData.revokedBy = actionBy || "system";
+    updateData.revokedBy = actionBy;
   }
 
   await updateDoc(ref, updateData);
