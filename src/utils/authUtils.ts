@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   signInWithEmailAndPassword,
   signOut,
+  sendPasswordResetEmail,
   User,
 } from "firebase/auth";
 import {
@@ -17,7 +18,7 @@ import {
 import { auth, db } from "@/lib/firebase";
 
 /* =======================
-   LOGIN VALIDATION
+   LOGIN SCHEMA
 ======================= */
 
 export const loginSchema = z.object({
@@ -33,6 +34,21 @@ export const loginSchema = z.object({
 export type LoginFormData = z.infer<typeof loginSchema>;
 
 /* =======================
+   FORGOT PASSWORD SCHEMA
+======================= */
+
+export const forgotPasswordSchema = z.object({
+  email: z
+    .string()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+});
+
+export type ForgotPasswordFormData = z.infer<
+  typeof forgotPasswordSchema
+>;
+
+/* =======================
    LOGIN HANDLER
 ======================= */
 
@@ -40,11 +56,6 @@ export const handleLogin = async (
   data: LoginFormData
 ): Promise<void> => {
   const { email, password } = data;
-
-  if (!email || !password) {
-    throw new Error("Email and password are required");
-  }
-
   await signInWithEmailAndPassword(auth, email, password);
 };
 
@@ -56,37 +67,4 @@ export const handleLogout = async (): Promise<void> => {
   await signOut(auth);
 };
 
-/* =======================
-   ADMIN CHECK (USED BY RouteProtection)
-======================= */
-
-export const isUserAdmin = async (
-  user: User | null
-): Promise<boolean> => {
-  try {
-    if (!user) return false;
-
-    // 1️⃣ Check by document ID (UID)
-    const adminDoc = await getDoc(doc(db, "admins", user.uid));
-    if (adminDoc.exists()) {
-      const data = adminDoc.data();
-      return data?.status === "approved";
-    }
-
-    // 2️⃣ Fallback: check by email
-    if (!user.email) return false;
-
-    const q = query(
-      collection(db, "admins"),
-      where("email", "==", user.email.toLowerCase())
-    );
-
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) return false;
-
-    return snapshot.docs[0].data()?.status === "approved";
-  } catch (error) {
-    console.error("Error checking admin status:", error);
-    return false;
-  }
-};
+/
