@@ -8,95 +8,89 @@ import {
   User,
 } from "firebase/auth";
 import {
-  doc,
-  getDoc,
   collection,
   query,
   where,
   getDocs,
+  getDoc,
+  doc,
+  updateDoc,
+  deleteField,
+  UpdateData,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
 /* =======================
-   LOGIN SCHEMA
+   TYPES
+======================= */
+
+export interface AdminUser {
+  uid: string;
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  status: "pending" | "approved" | "rejected" | "revoked";
+  requestedAt: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  rejectedAt?: string;
+  rejectedBy?: string;
+  revokedAt?: string;
+  revokedBy?: string;
+}
+
+/* =======================
+   SCHEMAS
 ======================= */
 
 export const loginSchema = z.object({
-  email: z
-    .string()
-    .min(1, "Email is required")
-    .email("Enter a valid email address"),
-  password: z
-    .string()
-    .min(6, "Password must be at least 6 characters"),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
 export type LoginFormData = z.infer<typeof loginSchema>;
 
-/* =======================
-   FORGOT PASSWORD SCHEMA
-======================= */
-
 export const forgotPasswordSchema = z.object({
-  email: z
-    .string()
-    .min(1, "Email is required")
-    .email("Enter a valid email address"),
+  email: z.string().email("Invalid email address"),
 });
 
-export type ForgotPasswordFormData = z.infer<
-  typeof forgotPasswordSchema
->;
+export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 
 /* =======================
-   LOGIN HANDLER
+   AUTH HANDLERS
 ======================= */
 
-export const handleLogin = async (
-  data: LoginFormData
-): Promise<void> => {
-  const { email, password } = data;
-  await signInWithEmailAndPassword(auth, email, password);
+export const handleLogin = async (data: LoginFormData): Promise<void> => {
+  await signInWithEmailAndPassword(auth, data.email, data.password);
 };
-
-/* =======================
-   LOGOUT HANDLER
-======================= */
 
 export const handleLogout = async (): Promise<void> => {
   await signOut(auth);
 };
 
-/* =======================
-   FORGOT PASSWORD HANDLER
-======================= */
-
-export const handleForgotPassword = async (
-  data: ForgotPasswordFormData
-): Promise<void> => {
-  const { email } = data;
-  await sendPasswordResetEmail(auth, email);
+export const handleForgotPassword = async (data: ForgotPasswordFormData): Promise<void> => {
+  await sendPasswordResetEmail(auth, data.email);
 };
 
 /* =======================
    ADMIN CHECK
 ======================= */
 
-export const isUserAdmin = async (
-  user: User | null
-): Promise<boolean> => {
+export const isUserAdmin = async (user: User | null): Promise<boolean> => {
   try {
     if (!user) return false;
 
-    // Check by UID
+    // Check by UID first (most secure)
     const adminDoc = await getDoc(doc(db, "admins", user.uid));
     if (adminDoc.exists()) {
       return adminDoc.data()?.status === "approved";
     }
 
-    // Fallback: check by email
     if (!user.email) return false;
 
+    // Fallback: Check by Email
     const q = query(
       collection(db, "admins"),
       where("email", "==", user.email.toLowerCase())
@@ -110,4 +104,61 @@ export const isUserAdmin = async (
     console.error("Admin check failed:", error);
     return false;
   }
+};
+
+/* =======================
+   ADMIN REQUESTS
+======================= */
+
+export const getAdminRequests = async (): Promise<AdminUser[]> => {
+  try {
+    const q = query(collection(db, "admins"));
+    const snapshot = await getDocs(q);
+
+    return snapshot.docs.map((docSnap) => {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        uid: data.uid || docSnap.id,
+        firstName: data.firstName || "",
+        lastName: data.lastName || "",
+        email: data.email || "",
+        phone: data.phone || "",
+        status: data.status || "pending",
+        requestedAt: data.requestedAt || new Date().toISOString(),
+        ...data, // Spread remaining optional fields (approvedAt, etc.)
+      } as AdminUser;
+    });
+  } catch (error) {
+    console.error("Failed to fetch admin requests:", error);
+    return [];
+  }
+};
+
+export const updateAdminRequestStatus = async (
+  uid: string,
+  status: "approved" | "rejected" | "revoked",
+  actionBy?: string
+): Promise<void> => {
+  const ref = doc(db, "admins", uid);
+  const now = new Date().toISOString();
+
+  // Using UpdateData<any> ensures Firestore accepts deleteField() alongside strings
+  const updateData: UpdateData<any> = { status };
+
+  if (status === "approved") {
+    updateData.approvedAt = now;
+    updateData.approvedBy = actionBy || "system";
+    updateData.rejectedAt = deleteField();
+    updateData.revokedAt = deleteField();
+  } else if (status === "rejected") {
+    updateData.rejectedAt = now;
+    updateData.rejectedBy = actionBy || "system";
+    updateData.approvedAt = deleteField();
+  } else if (status === "revoked") {
+    updateData.revokedAt = now;
+    updateData.revokedBy = actionBy || "system";
+  }
+
+  await updateDoc(ref, updateData);
 };
