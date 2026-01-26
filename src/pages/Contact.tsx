@@ -7,29 +7,27 @@ const Contact = () => {
   const { contactInfo } = state.data;
   const contactNumbers = contactInfo?.contactNumbers || [];
 
-  // Robust function to handle various Map inputs
-  const getEmbedUrl = (input: string | undefined, address: string | undefined): string | null => {
-    // 1. If user provided a specific Map Input (Embed Code or URL)
+  const getEmbedUrl = (
+    input: string | undefined,
+    address: string | undefined
+  ): string | null => {
     if (input) {
-      // CASE A: User pasted the full <iframe src="..."> code
       if (input.includes('<iframe')) {
         const srcMatch = input.match(/src="([^"]+)"/);
-        if (srcMatch && srcMatch[1]) {
-          return srcMatch[1]; // Return just the URL part
-        }
+        if (srcMatch?.[1]) return srcMatch[1];
       }
 
-      // CASE B: User pasted a valid Embed URL directly
-      if (input.includes('maps.google.com/maps') || input.includes('google.com/maps/embed')) {
+      if (
+        input.includes('maps.google.com/maps') ||
+        input.includes('google.com/maps/embed')
+      ) {
         return input;
       }
     }
 
-    // 2. Fallback: Generate a map from the text address
     if (address) {
       const encodedAddress = encodeURIComponent(address);
-      // specific format that works without API keys
-      return `https://maps.google.com/maps?q=${encodedAddress}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+      return `https://maps.google.com/maps?q=${encodedAddress}&z=15&output=embed`;
     }
 
     return null;
@@ -40,8 +38,9 @@ const Contact = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-school-blue-light via-white to-school-orange-light">
       <div className="container mx-auto px-4 py-8 space-y-12">
-        {/* Page Header */}
-        <section className="text-center animate-fade-in">
+
+        {/* Header */}
+        <section className="text-center">
           <h1 className="text-4xl md:text-5xl font-bold text-school-blue mb-4">
             Contact Us
           </h1>
@@ -50,34 +49,80 @@ const Contact = () => {
           </p>
         </section>
 
-        {/* Contact Information Grid */}
-        <section className="animate-fade-in">
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-            <Card className="text-center hover:shadow-lg transition-shadow duration-300 bg-white/80 backdrop-blur-sm border border-school-blue/20">
+        {/* Contact Cards */}
+        <section>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+            {/* Address */}
+            <Card className="text-center">
               <CardContent className="p-6">
-                <MapPin className="h-12 w-12 text-school-blue mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-school-blue mb-2">Address</h3>
+                <MapPin className="h-10 w-10 mx-auto mb-3 text-school-blue" />
+                <h3 className="font-semibold mb-2">Address</h3>
                 <p className="text-gray-600 whitespace-pre-line">
                   {contactInfo?.address || 'Address not available'}
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="text-center hover:shadow-lg transition-shadow duration-300 bg-white/80 backdrop-blur-sm border border-school-blue/20">
+            {/* Phone */}
+            <Card className="text-center">
               <CardContent className="p-6">
-                <Phone className="h-12 w-12 text-school-blue mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-school-blue mb-2">Phone</h3>
-                <div className="space-y-1">
-                  {contactNumbers.map((contact) => (
-                    <p key={contact.id} className="text-gray-600 text-sm">
-                      {contact.number}
+                <Phone className="h-10 w-10 mx-auto mb-3 text-school-blue" />
+                <h3 className="font-semibold mb-2">Phone</h3>
+                {contactNumbers.length > 0 ? (
+                  contactNumbers.map((c) => (
+                    <p key={c.id} className="text-gray-600 text-sm">
+                      {c.number}
                     </p>
-                  ))}
-                  {contactNumbers.length === 0 && (
-                    <p className="text-gray-600">+91 98765 43210</p>
-                  )}
-                </div>
+                  ))
+                ) : (
+                  <p className="text-gray-600">+91 98765 43210</p>
+                )}
               </CardContent>
             </Card>
 
-            <Card className="text
+            {/* Email */}
+            <Card className="text-center">
+              <CardContent className="p-6">
+                <Mail className="h-10 w-10 mx-auto mb-3 text-school-blue" />
+                <h3 className="font-semibold mb-2">Email</h3>
+                <p className="text-gray-600">
+                  {contactInfo?.email || 'info@newnarayanaschool.com'}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Working Hours */}
+            <Card className="text-center">
+              <CardContent className="p-6">
+                <Clock className="h-10 w-10 mx-auto mb-3 text-school-blue" />
+                <h3 className="font-semibold mb-2">Working Hours</h3>
+                <p className="text-gray-600">
+                  {contactInfo?.workingHours || 'Mon – Sat, 9:00 AM – 5:00 PM'}
+                </p>
+              </CardContent>
+            </Card>
+
+          </div>
+        </section>
+
+        {/* Map */}
+        {mapUrl && (
+          <section>
+            <div className="w-full h-[400px] rounded-lg overflow-hidden border">
+              <iframe
+                src={mapUrl}
+                width="100%"
+                height="100%"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Contact;
