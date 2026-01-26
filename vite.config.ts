@@ -1,9 +1,12 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
+import { fileURLToPath } from "url";
 
-// https://vitejs.dev/config/
+// Standard way to define __dirname in ESM for reliable Vercel builds
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
@@ -11,12 +14,19 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    mode === 'development' &&
-    componentTagger(),
+    // Lovable tagger removed as requested
   ].filter(Boolean),
   resolve: {
     alias: {
+      // Direct alias for Narayana School source files
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  build: {
+    // Standard Vercel output directory
+    outDir: "dist",
+    // Clean up console logs in production for Narayana School deployment
+    minify: "esbuild",
+    sourcemap: mode === "development",
   },
 }));
