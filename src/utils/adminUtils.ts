@@ -1,11 +1,11 @@
 // src/utils/adminUtils.ts
 
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-/* =======================
-   DEFAULT ADMIN CONFIG
-======================= */
+/* =========================
+   SUPER ADMIN CONFIG
+========================= */
 
 export const DEFAULT_ADMIN = {
   email: "arunnanna3@gmail.com",
@@ -14,42 +14,36 @@ export const DEFAULT_ADMIN = {
   phone: "+91 98480 47368",
 };
 
-/* =======================
-   ENSURE DEFAULT ADMIN
-======================= */
+/* =========================
+   ENSURE SUPER ADMIN
+========================= */
 
 /**
- * Ensures the super admin exists in Firestore.
- * This should be called ONLY after Firebase Auth login,
- * with a valid authenticated UID.
+ * Creates the super admin record if it does not already exist.
+ * Must be called AFTER Firebase authentication.
  */
 export const ensureDefaultAdmin = async (
   uid: string,
   email?: string | null
 ): Promise<void> => {
-  if (!uid) {
-    console.warn("ensureDefaultAdmin called without uid");
-    return;
-  }
+  if (!uid) return;
 
   try {
     const adminRef = doc(db, "admins", uid);
-    const snap = await getDoc(adminRef);
+    const snapshot = await getDoc(adminRef);
 
-    // ✅ Admin already exists → nothing to do
-    if (snap.exists()) {
+    // ✅ Already exists
+    if (snapshot.exists()) return;
+
+    // 🔐 Allow auto-create ONLY for default admin email
+    const normalizedEmail =
+      typeof email === "string" ? email.toLowerCase() : "";
+
+    if (normalizedEmail !== DEFAULT_ADMIN.email.toLowerCase()) {
       return;
     }
 
-    // 🛡️ Only create if email matches default admin
-    const safeEmail = typeof email === "string" ? email.toLowerCase() : "";
-
-    if (safeEmail !== DEFAULT_ADMIN.email.toLowerCase()) {
-      console.warn("Non-default admin attempted auto-creation:", safeEmail);
-      return;
-    }
-
-    // 🔥 Create SUPER ADMIN
+    // 🔥 Create super admin
     await setDoc(adminRef, {
       uid,
       email: DEFAULT_ADMIN.email,
@@ -62,8 +56,8 @@ export const ensureDefaultAdmin = async (
       approvedBy: "system",
     });
 
-    console.log("✅ Default admin record created");
-  } catch (error) {
-    console.error("❌ Error ensuring default admin:", error);
+    console.info("✅ Super admin created successfully");
+  } catch (err) {
+    console.error("❌ Failed to ensure super admin:", err);
   }
 };
