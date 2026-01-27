@@ -5,7 +5,7 @@ import { Home, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/auth/useAuth'; // ✅ IMPORTANT
+import { useAuth } from '@/components/auth/useAuth'; // ✅ IMPORTANT
 
 // Managers
 import ContentManager from '@/components/admin/ContentManager';
