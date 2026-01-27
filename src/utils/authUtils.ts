@@ -186,3 +186,20 @@ export const updateAdminRequestStatus = async (
 
   await updateDoc(ref, updateData);
 };
+/* =======================
+   ROUTE ADMIN CHECK
+======================= */
+
+export const isUserAdmin = async (
+  uid: string | null | undefined
+): Promise<boolean> => {
+  if (!uid) return false;
+
+  try {
+    const snap = await getDoc(doc(db, "admins", uid));
+    return snap.exists() && snap.data()?.status === "approved";
+  } catch (error) {
+    console.error("isUserAdmin failed:", error);
+    return false;
+  }
+};
