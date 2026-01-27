@@ -13,10 +13,6 @@ import {
   limit,
 } from "firebase/firestore";
 
-/* =======================
-   INTERFACES
-======================= */
-
 export interface SecurityEvent {
   id?: string;
   type: SecurityEventType;
@@ -30,16 +26,8 @@ export interface SecurityEvent {
   resolvedBy?: string;
 }
 
-/* =======================
-   CLASS
-======================= */
-
 export class AdvancedSecurityMonitor {
   private readonly LOCATION_CHANGE_THRESHOLD = 2;
-
-  /* =======================
-     MAIN ENTRY
-  ======================= */
 
   async analyzeLoginAttempt(
     email: string,
@@ -47,34 +35,37 @@ export class AdvancedSecurityMonitor {
     userId?: string
   ): Promise<void> {
     try {
-      const clientInfo = await getSecurityClientInfo();
+      let clientInfo: any = null;
 
-      await this.logLoginActivity(email, success, userId, clientInfo);
-      await this.analyzeLoginPattern(email);
+      // 🔐 IMPORTANT: SSR SAFETY
+      if (typeof window !== "undefined") {
+        clientInfo = await getSecurityClientInfo();
+      }
 
-      if (success && userId && clientInfo?.fingerprint) {
-        await this.analyzeDeviceFingerprint(
-          userId,
-          email,
-          clientInfo.fingerprint
-        );
+      if (clientInfo) {
+        await this.logLoginActivity(email, success, userId, clientInfo);
+        await this.analyzeLoginPattern(email);
 
-        if (clientInfo.fingerprint.timezone) {
-          await this.analyzeGeographicLocation(
+        if (success && userId && clientInfo?.fingerprint) {
+          await this.analyzeDeviceFingerprint(
             userId,
             email,
-            clientInfo.fingerprint.timezone
+            clientInfo.fingerprint
           );
+
+          if (clientInfo.fingerprint.timezone) {
+            await this.analyzeGeographicLocation(
+              userId,
+              email,
+              clientInfo.fingerprint.timezone
+            );
+          }
         }
       }
     } catch (error) {
       console.error("Security analysis failed:", error);
     }
   }
-
-  /* =======================
-     HELPERS
-  ======================= */
 
   private async logLoginActivity(
     email: string,
@@ -87,8 +78,8 @@ export class AdvancedSecurityMonitor {
       adminId: userId || null,
       status: success ? "success" : "failed",
       loginTime: new Date().toISOString(),
-      ip: clientInfo?.ip || "unknown",
-      userAgent: clientInfo?.userAgent || "unknown",
+      ip: clientInfo?.ipAddress || "unknown",
+      userAgent: clientInfo?.fingerprint?.userAgent || "unknown",
       timezone: clientInfo?.fingerprint?.timezone || null,
     });
   }
@@ -121,12 +112,12 @@ export class AdvancedSecurityMonitor {
     email: string,
     fingerprint: any
   ): Promise<void> {
-    if (!fingerprint?.id) return;
+    if (!fingerprint?.userAgent) return;
 
     const q = query(
       collection(db, "device_profiles"),
       where("adminId", "==", adminId),
-      where("fingerprint", "==", fingerprint.id),
+      where("fingerprint", "==", fingerprint.userAgent),
       limit(1)
     );
 
@@ -184,9 +175,5 @@ export class AdvancedSecurityMonitor {
     });
   }
 }
-
-/* =======================
-   SINGLETON EXPORT
-======================= */
 
 export const advancedSecurityMonitor = new AdvancedSecurityMonitor();
