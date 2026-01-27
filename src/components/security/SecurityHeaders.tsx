@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 
 const SecurityHeaders = () => {
@@ -50,7 +49,9 @@ const SecurityHeaders = () => {
     addHttpEquivTag('Content-Security-Policy', csp);
     
     // Additional security meta tags
-    addMetaTag('robots', 'noindex, nofollow'); // For admin areas
+    // ✅ FIX: "noindex" line removed. 
+    // You can explicitly add "index, follow" if you want, but it is not required (default is index).
+    addMetaTag('robots', 'index, follow'); 
     addMetaTag('format-detection', 'telephone=no');
     
   }, []);
