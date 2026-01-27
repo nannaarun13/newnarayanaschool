@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { fileURLToPath } from "url";
+import Sitemap from "vite-plugin-sitemap"; // 1. Added this import
 
 // Standard way to define __dirname in ESM for reliable Vercel builds
 const __filename = fileURLToPath(import.meta.url);
@@ -14,18 +15,19 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    // Lovable tagger removed as requested
+    // 2. Added the Sitemap plugin here
+    Sitemap({ 
+      hostname: "https://newnarayanaschool.netlify.app",
+      dynamicRoutes: ["/", "/about", "/contact"], // Add your specific routes
+    }),
   ].filter(Boolean),
   resolve: {
     alias: {
-      // Direct alias for Narayana School source files
       "@": path.resolve(__dirname, "./src"),
     },
   },
   build: {
-    // Standard Vercel output directory
     outDir: "dist",
-    // Clean up console logs in production for Narayana School deployment
     minify: "esbuild",
     sourcemap: mode === "development",
   },
