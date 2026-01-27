@@ -11,7 +11,12 @@ import {
   getDocs,
   orderBy,
   limit,
+  Timestamp,
 } from "firebase/firestore";
+
+/* =======================
+   TYPES
+======================= */
 
 export interface SecurityEvent {
   id?: string;
@@ -22,12 +27,18 @@ export interface SecurityEvent {
   severity: "low" | "medium" | "high" | "critical";
   details: Record<string, any>;
   resolved: boolean;
-  resolvedAt?: string;
-  resolvedBy?: string;
 }
+
+/* =======================
+   CLASS
+======================= */
 
 export class AdvancedSecurityMonitor {
   private readonly LOCATION_CHANGE_THRESHOLD = 2;
+
+  /* =======================
+     LOGIN ANALYSIS
+  ======================= */
 
   async analyzeLoginAttempt(
     email: string,
@@ -35,37 +46,83 @@ export class AdvancedSecurityMonitor {
     userId?: string
   ): Promise<void> {
     try {
-      let clientInfo: any = null;
+      // SSR SAFETY
+      if (typeof window === "undefined") return;
 
-      // 🔐 IMPORTANT: SSR SAFETY
-      if (typeof window !== "undefined") {
-        clientInfo = await getSecurityClientInfo();
-      }
+      const clientInfo = await getSecurityClientInfo();
 
-      if (clientInfo) {
-        await this.logLoginActivity(email, success, userId, clientInfo);
-        await this.analyzeLoginPattern(email);
+      await this.logLoginActivity(email, success, userId, clientInfo);
+      await this.analyzeLoginPattern(email);
 
-        if (success && userId && clientInfo?.fingerprint) {
-          await this.analyzeDeviceFingerprint(
+      if (success && userId && clientInfo?.fingerprint) {
+        await this.analyzeDeviceFingerprint(
+          userId,
+          email,
+          clientInfo.fingerprint
+        );
+
+        if (clientInfo.fingerprint.timezone) {
+          await this.analyzeGeographicLocation(
             userId,
             email,
-            clientInfo.fingerprint
+            clientInfo.fingerprint.timezone
           );
-
-          if (clientInfo.fingerprint.timezone) {
-            await this.analyzeGeographicLocation(
-              userId,
-              email,
-              clientInfo.fingerprint.timezone
-            );
-          }
         }
       }
     } catch (error) {
       console.error("Security analysis failed:", error);
     }
   }
+
+  /* =======================
+     METRICS (FIXED)
+  ======================= */
+
+  async getSecurityMetrics() {
+    try {
+      const since = new Date();
+      since.setHours(since.getHours() - 24);
+
+      const q = query(
+        collection(db, "security_events"),
+        where("timestamp", ">=", since.toISOString()),
+        orderBy("timestamp", "desc")
+      );
+
+      const snapshot = await getDocs(q);
+      const events = snapshot.docs.map((d) => d.data());
+
+      const metrics = {
+        totalEvents: events.length,
+        criticalEvents: events.filter(e => e.severity === "critical").length,
+        highSeverityEvents: events.filter(e => e.severity === "high").length,
+        unresolvedEvents: events.filter(e => !e.resolved).length,
+        eventsByType: {} as Record<string, number>,
+        last24Hours: events,
+      };
+
+      for (const event of events) {
+        metrics.eventsByType[event.type] =
+          (metrics.eventsByType[event.type] || 0) + 1;
+      }
+
+      return metrics;
+    } catch (error) {
+      console.error("Failed to load security metrics:", error);
+      return {
+        totalEvents: 0,
+        criticalEvents: 0,
+        highSeverityEvents: 0,
+        unresolvedEvents: 0,
+        eventsByType: {},
+        last24Hours: [],
+      };
+    }
+  }
+
+  /* =======================
+     HELPERS
+  ======================= */
 
   private async logLoginActivity(
     email: string,
@@ -175,5 +232,9 @@ export class AdvancedSecurityMonitor {
     });
   }
 }
+
+/* =======================
+   SINGLETON EXPORT
+======================= */
 
 export const advancedSecurityMonitor = new AdvancedSecurityMonitor();
