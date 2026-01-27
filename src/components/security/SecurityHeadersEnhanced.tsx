@@ -26,7 +26,6 @@ const SecurityHeadersEnhanced = () => {
 
     // ✅ SAFE, browser-respected meta tags
     setMeta("referrer", "strict-origin-when-cross-origin");
-    setMeta("robots", "noindex, nofollow");
     setMeta("format-detection", "telephone=no");
     setMeta("theme-color", "#1e40af");
 
