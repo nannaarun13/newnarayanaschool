@@ -9,8 +9,6 @@ import {
 } from "firebase/auth";
 import {
   collection,
-  query,
-  where,
   getDocs,
   getDoc,
   doc,
@@ -34,12 +32,8 @@ export const DEFAULT_ADMIN_EMAIL = "arunnanna3@gmail.com";
 export interface AdminUser {
   id: string;
   uid: string;
-  firstName?: string;
-  lastName?: string;
   email: string;
-  phone?: string;
   status: "pending" | "approved" | "rejected" | "revoked";
-  requestedAt?: string;
   approvedAt?: string;
   approvedBy?: string;
   rejectedAt?: string;
@@ -72,20 +66,24 @@ export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 export const handleLogin = async (
   data: LoginFormData
 ): Promise<User> => {
-  const cred = await signInWithEmailAndPassword(
-    auth,
-    data.email.toLowerCase(),
-    data.password
-  );
+  // 🛡️ HARD SAFETY (prevents indexOf crash)
+  const email =
+    typeof data?.email === "string" ? data.email.trim().toLowerCase() : "";
+  const password =
+    typeof data?.password === "string" ? data.password : "";
 
+  if (!email || !password) {
+    throw new Error("Email and password are required");
+  }
+
+  const cred = await signInWithEmailAndPassword(auth, email, password);
   const user = cred.user;
 
-  // 🔐 Ensure admin record exists & is valid
-  const isAdmin = await ensureAdminAccess(user);
+  const allowed = await ensureAdminAccess(user);
 
-  if (!isAdmin) {
+  if (!allowed) {
     await signOut(auth);
-    throw new Error("Access denied. Not an approved admin.");
+    throw new Error("Your account is not approved by the Super Admin.");
   }
 
   return user;
@@ -98,7 +96,14 @@ export const handleLogout = async (): Promise<void> => {
 export const handleForgotPassword = async (
   data: ForgotPasswordFormData
 ): Promise<void> => {
-  await sendPasswordResetEmail(auth, data.email.toLowerCase());
+  const email =
+    typeof data?.email === "string" ? data.email.trim().toLowerCase() : "";
+
+  if (!email) {
+    throw new Error("Email is required");
+  }
+
+  await sendPasswordResetEmail(auth, email);
 };
 
 /* =======================
@@ -108,21 +113,20 @@ export const handleForgotPassword = async (
 export const ensureAdminAccess = async (
   user: User | null
 ): Promise<boolean> => {
-  if (!user || !user.uid) return false;
+  if (!user?.uid || !user.email) return false;
 
-  const email = user.email?.toLowerCase() || "";
-  const adminRef = doc(db, "admins", user.uid);
-  const snap = await getDoc(adminRef);
+  const email = user.email.toLowerCase();
+  const ref = doc(db, "admins", user.uid);
+  const snap = await getDoc(ref);
 
-  // ✅ Admin document exists
+  // ✅ Admin exists
   if (snap.exists()) {
-    const data = snap.data();
-    return data.status === "approved";
+    return snap.data()?.status === "approved";
   }
 
-  // 🔥 Auto-create SUPER ADMIN
+  // 🔥 Auto-create Super Admin
   if (email === DEFAULT_ADMIN_EMAIL) {
-    await setDoc(adminRef, {
+    await setDoc(ref, {
       uid: user.uid,
       email,
       status: "approved",
@@ -132,19 +136,7 @@ export const ensureAdminAccess = async (
     return true;
   }
 
-  // ❌ Not admin
   return false;
-};
-
-export const isUserAdmin = async (
-  user: User | null
-): Promise<boolean> => {
-  if (!user) return false;
-
-  const adminSnap = await getDoc(doc(db, "admins", user.uid));
-  if (!adminSnap.exists()) return false;
-
-  return adminSnap.data()?.status === "approved";
 };
 
 /* =======================
@@ -154,13 +146,13 @@ export const isUserAdmin = async (
 export const getAdminRequests = async (): Promise<AdminUser[]> => {
   try {
     const snapshot = await getDocs(collection(db, "admins"));
-    return snapshot.docs.map((docSnap) => ({
-      id: docSnap.id,
-      uid: docSnap.id,
-      ...docSnap.data(),
-    })) as AdminUser[];
-  } catch (error) {
-    console.error("Failed to fetch admins:", error);
+    return snapshot.docs.map((d) => ({
+      id: d.id,
+      uid: d.id,
+      ...(d.data() as any),
+    }));
+  } catch (err) {
+    console.error("Failed to fetch admins:", err);
     return [];
   }
 };
