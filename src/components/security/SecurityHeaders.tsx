@@ -2,61 +2,60 @@ import { useEffect } from 'react';
 
 const SecurityHeaders = () => {
   useEffect(() => {
-    // Add security-related meta tags dynamically
-    const addMetaTag = (name: string, content: string) => {
-      const existing = document.querySelector(`meta[name="${name}"]`);
-      if (existing) {
-        existing.setAttribute('content', content);
-      } else {
-        const meta = document.createElement('meta');
-        meta.name = name;
-        meta.content = content;
+    /**
+     * Add or update a meta tag by name
+     */
+    const setMeta = (name: string, content: string) => {
+      let meta = document.querySelector(`meta[name="${name}"]`);
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', name);
         document.head.appendChild(meta);
       }
+      meta.setAttribute('content', content);
     };
 
-    const addHttpEquivTag = (httpEquiv: string, content: string) => {
-      const existing = document.querySelector(`meta[http-equiv="${httpEquiv}"]`);
-      if (existing) {
-        existing.setAttribute('content', content);
-      } else {
-        const meta = document.createElement('meta');
+    /**
+     * Add or update a meta tag by http-equiv
+     * NOTE: Only CSP is respected here by modern browsers
+     */
+    const setHttpEquiv = (httpEquiv: string, content: string) => {
+      let meta = document.querySelector(`meta[http-equiv="${httpEquiv}"]`);
+      if (!meta) {
+        meta = document.createElement('meta');
         meta.setAttribute('http-equiv', httpEquiv);
-        meta.content = content;
         document.head.appendChild(meta);
       }
+      meta.setAttribute('content', content);
     };
 
-    // Security headers
-    addHttpEquivTag('X-Content-Type-Options', 'nosniff');
-    addHttpEquivTag('X-Frame-Options', 'DENY');
-    addHttpEquivTag('X-XSS-Protection', '1; mode=block');
-    addHttpEquivTag('Referrer-Policy', 'strict-origin-when-cross-origin');
-    
-    // Content Security Policy (basic for client-side app)
-    const csp = [
+    /* --------------------------------------------------
+       Content Security Policy (SAFE for Firebase + React)
+       -------------------------------------------------- */
+    const contentSecurityPolicy = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://*.firebaseapp.com",
+      "script-src 'self' https://www.gstatic.com https://www.googleapis.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: https: blob:",
-      "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com wss://*.firebaseio.com",
-      "frame-src 'self' https://*.firebaseapp.com",
+      "img-src 'self' data: https:",
+      "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com",
+      "frame-src https://*.firebaseapp.com",
       "object-src 'none'",
-      "base-uri 'self'"
+      "base-uri 'self'",
+      "form-action 'self'"
     ].join('; ');
-    
-    addHttpEquivTag('Content-Security-Policy', csp);
-    
-    // Additional security meta tags
-    // ✅ FIX: "noindex" line removed. 
-    // You can explicitly add "index, follow" if you want, but it is not required (default is index).
-    addMetaTag('robots', 'index, follow'); 
-    addMetaTag('format-detection', 'telephone=no');
-    
+
+    setHttpEquiv('Content-Security-Policy', contentSecurityPolicy);
+
+    /* --------------------------------------------------
+       Legit meta tags (SEO + UX safe)
+       -------------------------------------------------- */
+    setMeta('format-detection', 'telephone=no');
+    setMeta('referrer', 'strict-origin-when-cross-origin');
+
   }, []);
 
-  return null; // This component only adds meta tags
+  return null;
 };
 
 export default SecurityHeaders;
