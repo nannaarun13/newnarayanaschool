@@ -1,4 +1,4 @@
-// securityClientInfo.ts
+// src/utils/securityClientInfo.ts
 
 interface ClientFingerprint {
   userAgent: string;
@@ -18,7 +18,9 @@ export interface SecurityClientInfo {
   sessionId: string;
 }
 
-// Helper to fetch public IP
+// --------------------
+// Helper: Public IP
+// --------------------
 const getPublicIP = async (): Promise<string> => {
   try {
     const response = await fetch("https://api.ipify.org?format=json");
@@ -32,6 +34,9 @@ const getPublicIP = async (): Promise<string> => {
   return "unknown";
 };
 
+// --------------------
+// Helper: Sanitize
+// --------------------
 const sanitizeClientData = (
   data: unknown,
   maxLength: number = 200
@@ -40,27 +45,42 @@ const sanitizeClientData = (
   return data.replace(/[<>'"&`]/g, "").trim().substring(0, maxLength);
 };
 
+// --------------------
+// Fingerprint (SSR SAFE)
+// --------------------
 export const generateClientFingerprint = (): ClientFingerprint => {
+  if (typeof window === "undefined") {
+    return {
+      userAgent: "unknown",
+      screen: "unknown",
+      timezone: "unknown",
+      language: "unknown",
+      platform: "unknown",
+      cookieEnabled: false,
+      doNotTrack: "unknown",
+      hardwareConcurrency: 0,
+    };
+  }
+
   try {
     const nav = window.navigator as any;
 
     return {
-      userAgent: sanitizeClientData(nav.userAgent, 500),
+      userAgent: sanitizeClientData(nav?.userAgent, 500),
       screen: window.screen
         ? `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}`
         : "unknown",
       timezone:
         Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-      language: nav.language || "unknown",
+      language: nav?.language || "unknown",
       platform: sanitizeClientData(
-        nav.platform || nav.userAgentData?.platform || "unknown"
+        nav?.platform || nav?.userAgentData?.platform || "unknown"
       ),
-      cookieEnabled: Boolean(nav.cookieEnabled),
-      doNotTrack: nav.doNotTrack || "unknown",
-      hardwareConcurrency: nav.hardwareConcurrency || 0,
+      cookieEnabled: Boolean(nav?.cookieEnabled),
+      doNotTrack: nav?.doNotTrack || "unknown",
+      hardwareConcurrency: nav?.hardwareConcurrency || 0,
     };
-  } catch (error) {
-    console.error("Error generating client fingerprint:", error);
+  } catch {
     return {
       userAgent: "unknown",
       screen: "unknown",
@@ -74,7 +94,14 @@ export const generateClientFingerprint = (): ClientFingerprint => {
   }
 };
 
+// --------------------
+// Session ID (SSR SAFE)
+// --------------------
 const generateSessionId = (): string => {
+  if (typeof window === "undefined") {
+    return `server_${Date.now().toString(36)}`;
+  }
+
   const timestamp = Date.now().toString(36);
   const randomPart =
     window.crypto && "getRandomValues" in window.crypto
@@ -86,9 +113,20 @@ const generateSessionId = (): string => {
   return `${timestamp}_${randomPart}`;
 };
 
-// Main function
+// --------------------
+// Main Client Info (SSR SAFE)
+// --------------------
 export const getSecurityClientInfo =
   async (): Promise<SecurityClientInfo> => {
+    if (typeof window === "undefined") {
+      return {
+        fingerprint: generateClientFingerprint(),
+        ipAddress: "unknown",
+        timestamp: new Date().toISOString(),
+        sessionId: generateSessionId(),
+      };
+    }
+
     const ip = await getPublicIP();
 
     return {
@@ -99,7 +137,9 @@ export const getSecurityClientInfo =
     };
   };
 
-// Optional anomaly detection
+// --------------------
+// Optional Anomaly Detection
+// --------------------
 export const detectAnomalies = (
   currentInfo: SecurityClientInfo,
   historicalInfo?: SecurityClientInfo[]
@@ -110,7 +150,6 @@ export const detectAnomalies = (
     return anomalies;
   }
 
-  // Compare against the MOST RECENT login
   const lastKnownInfo = historicalInfo[0];
 
   if (
